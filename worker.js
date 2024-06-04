@@ -1,3 +1,23 @@
+// Add a new context menu for setting the target language
+chrome.contextMenus.create({
+  id: 'language',
+  title: 'Set target language',
+  contexts: ['action'],
+  type: 'normal'
+});
+
+// Add languages as children of the 'language' context menu
+['en', 'es', 'fr', 'de', 'it', 'pt'].forEach(lang => {
+  chrome.contextMenus.create({
+    id: `language-${lang}`,
+    title: lang,
+    contexts: ['action'],
+    parentId: 'language',
+    type: 'radio',
+    checked: lang === lang
+  })
+})
+
 chrome.action.onClicked.addListener(async tab => {
   try {
     await chrome.scripting.insertCSS({
@@ -151,6 +171,13 @@ chrome.runtime.onInstalled.addListener(() => chrome.storage.local.get({
 }));
 
 chrome.contextMenus.onClicked.addListener(info => {
+  // Handle the selection of the target language
+  if (info.menuItemId.startsWith('translate-')) {
+    chrome.storage.local.set({
+      'language': info.menuItemId.slize(9)
+    });
+  }
+  
   if (info.menuItemId.startsWith('magnification-')) {
     chrome.storage.local.set({
       'magnification': parseFloat(info.menuItemId.slice(14))
@@ -162,6 +189,29 @@ chrome.contextMenus.onClicked.addListener(info => {
     });
   }
 });
+
+// Modify the mouse event listener to handle the translation
+document.addEventListener('mousemove', function(e) {
+  if (e.button === 0) { // Left mouse button clicked
+    chrome.storage.local.get('language', function(data) {
+      var targetLanguage = data.language;
+      var magnifiedText = getMagnifiedText(); // Assume this function is already defined
+      fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLanguage}&dt=t&q=${encodeURIComponent(magnifiedText)}`)
+        .then(response => response.json())
+        .then(data => {
+          var translatedText = data[0][0][0];
+          displayTranslatedText(translatedText); // Assume this function is already defined
+        });
+    });
+  } 
+});
+
+// 
+document.addEventListener('mouseup', function(e) {
+  if (e.button === 0) {
+    revertText(); // Assume this function is already defined
+  }
+})
 
 /* FAQs & Feedback */
 {
